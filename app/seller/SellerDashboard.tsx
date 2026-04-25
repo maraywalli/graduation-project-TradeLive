@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Package, ShoppingBag, DollarSign, Star, Edit, Trash2, X, Upload, Loader2, Sparkles, Wand2, Clock } from 'lucide-react';
+import { Plus, Package, ShoppingBag, DollarSign, Star, Edit, Trash2, X, Upload, Loader2, Sparkles, Wand2, Clock, MapPin } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
+import LocationPicker from '@/components/marketplace/LocationPicker';
 
 const CATEGORIES = ['electronics', 'fashion', 'home', 'vehicles', 'beauty', 'sports', 'kids', 'other'];
 const CONDITIONS = ['new', 'like_new', 'good', 'fair', 'used'];
@@ -208,6 +209,7 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Server-side upload — bypasses storage RLS so authenticated users can
   // always upload regardless of bucket-policy state. Each file is compressed
@@ -359,20 +361,40 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
             </div>
           )}
           <div>
-            <button
-              type="button"
-              onClick={captureLocation}
-              disabled={locating}
-              className="w-full py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>📍</span>}
-              {form.latitude != null
-                ? (locale === 'ku' ? `شوێنی ئامادە (${form.latitude.toFixed(3)}, ${form.longitude?.toFixed(3)}) — کلیک بکە بۆ نوێکردنەوە` : `Location set (${form.latitude.toFixed(3)}, ${form.longitude?.toFixed(3)}) — tap to refresh`)
-                : (locale === 'ku' ? 'شوێنی منی بدۆزەرەوە (بۆ نەخشە)' : 'Use my location (for map)')}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm flex items-center justify-center gap-2"
+              >
+                <MapPin className="w-4 h-4" />
+                {form.latitude != null
+                  ? (locale === 'ku' ? 'گۆڕینی شوێن' : 'Change location')
+                  : (locale === 'ku' ? 'هەڵبژاردنی شوێن لەسەر نەخشە' : 'Pick on map')}
+              </button>
+              <button
+                type="button"
+                onClick={captureLocation}
+                disabled={locating}
+                className="py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>📍</span>}
+                {locale === 'ku' ? 'شوێنی من' : 'Use my GPS'}
+              </button>
+            </div>
+            {form.latitude != null && (
+              <div className="mt-2 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 text-xs">
+                <div className="font-bold text-zinc-900 dark:text-white truncate">
+                  {form.location || (locale === 'ku' ? 'شوێنی هەڵبژێردراو' : 'Selected location')}
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-0.5">
+                  {form.latitude.toFixed(5)}, {form.longitude?.toFixed(5)}
+                </div>
+              </div>
+            )}
             <p className="text-[10px] text-zinc-500 mt-1 font-medium">
               {locale === 'ku'
-                ? 'بەرهەمەکەت لە نەخشەی بازاڕ پیشان دەدرێت ئەگەر شوێن دیاری بکەیت.'
+                ? 'بەرهەمەکەت لە نەخشەی بازاڕ پیشان دەدرێت.'
                 : 'Adding a location places your item on the marketplace map.'}
             </p>
           </div>
