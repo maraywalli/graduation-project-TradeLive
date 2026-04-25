@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, Star, Package, Building2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ShieldCheck, Star, Package, Building2, ShoppingCart, Bell, Loader2, Check } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
+import { toast } from '@/components/ui/Toaster';
 
 export function BrandPageClient({ brand, items }: { brand: any; items: any[] }) {
   const { t, locale } = useI18n();
@@ -83,43 +86,143 @@ export function BrandPageClient({ brand, items }: { brand: any; items: any[] }) 
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {items.map((item) => {
-            const stock = Number(item.stock ?? 0);
-            return (
-              <Link
-                key={item.id}
-                href={`/items/${item.id}`}
-                className="group bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-orange-500 transition"
-              >
-                <div className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative">
-                  {item.images?.[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-400 text-3xl font-black">{item.title?.[0]}</div>
-                  )}
-                  <span
-                    className={
-                      'absolute top-2 end-2 text-[10px] font-black px-2 py-1 rounded-full ' +
-                      (stock > 0 ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white')
-                    }
-                  >
-                    {stock > 0
-                      ? `${stock} ${locale === 'ku' ? 'لە بەردەست' : 'in stock'}`
-                      : (locale === 'ku' ? 'پێش-فەرمانگرتن' : 'Pre-order')}
-                  </span>
-                </div>
-                <div className="p-3">
-                  <div className="font-black text-sm truncate">{item.title}</div>
-                  <div className="font-black text-orange-500 text-sm mt-0.5">
-                    {Number(item.price).toLocaleString()} {item.currency}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {items.map((item) => (
+            <ProductCard
+              key={item.id}
+              item={item}
+              brandSlug={brand.slug}
+              ownItem={item.seller_id === user?.id}
+            />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Product card with inline Buy / Pre-order action so customers don't have to
+ * navigate to the item detail page just to add a single product to their cart
+ * or join the waitlist. The card image + title still link to the detail page
+ * for the full description / images.
+ */
+function ProductCard({
+  item,
+  brandSlug,
+  ownItem,
+}: {
+  item: any;
+  brandSlug: string;
+  ownItem: boolean;
+}) {
+  const { locale } = useI18n();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const stock = Number(item.stock ?? 0);
+  const inStock = stock > 0;
+
+  const handleAction = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      router.push(`/login?redirect=/brands/${encodeURIComponent(brandSlug)}`);
+      return;
+    }
+    if (ownItem) {
+      toast(locale === 'ku' ? 'ئەمە بەرهەمی خۆتە' : "This is your own product", 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      if (inStock) {
+        const res = await fetch('/api/cart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: item.id, quantity: 1 }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || 'Failed');
+        toast(locale === 'ku' ? 'زیادکرا بۆ سەبەتە' : 'Added to cart');
+      } else {
+        const res = await fetch('/api/preorders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: item.id, quantity: 1 }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || 'Failed');
+        toast(locale === 'ku' ? 'لیستی چاوەڕوانی زیادکرا' : 'Joined waitlist');
+      }
+      setDone(true);
+      setTimeout(() => setDone(false), 2000);
+    } catch (err: any) {
+      toast(err.message || 'Failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="group bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-orange-500 transition flex flex-col">
+      <Link href={`/items/${item.id}`} className="block">
+        <div className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative">
+          {item.images?.[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-zinc-400 text-3xl font-black">{item.title?.[0]}</div>
+          )}
+          <span
+            className={
+              'absolute top-2 end-2 text-[10px] font-black px-2 py-1 rounded-full ' +
+              (inStock ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white')
+            }
+          >
+            {inStock
+              ? `${stock} ${locale === 'ku' ? 'لە بەردەست' : 'in stock'}`
+              : (locale === 'ku' ? 'پێش-فەرمانگرتن' : 'Pre-order')}
+          </span>
+        </div>
+        <div className="p-3 pb-2">
+          <div className="font-black text-sm truncate">{item.title}</div>
+          <div className="font-black text-orange-500 text-sm mt-0.5">
+            {Number(item.price).toLocaleString()} {item.currency}
+          </div>
+        </div>
+      </Link>
+
+      <div className="px-3 pb-3 mt-auto">
+        <button
+          onClick={handleAction}
+          disabled={loading || authLoading || ownItem}
+          className={
+            'w-full py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition disabled:opacity-50 ' +
+            (inStock
+              ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90'
+              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/40 hover:bg-amber-500/20')
+          }
+        >
+          {loading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : done ? (
+            <Check className="w-3.5 h-3.5" />
+          ) : inStock ? (
+            <ShoppingCart className="w-3.5 h-3.5" />
+          ) : (
+            <Bell className="w-3.5 h-3.5" />
+          )}
+          {ownItem
+            ? (locale === 'ku' ? 'بەرهەمی خۆت' : 'Your product')
+            : done
+            ? (locale === 'ku' ? 'کرا!' : 'Done!')
+            : inStock
+            ? (locale === 'ku' ? 'کڕین' : 'Add to cart')
+            : (locale === 'ku' ? 'پێش-فەرمان' : 'Pre-order')}
+        </button>
+      </div>
     </div>
   );
 }
