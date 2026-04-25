@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+  --font-sans: 'Inter', 'Noto Kufi Arabic', system-ui, sans-serif;
+}
+
+html, body {
+  background: #fafafa;
+  color: #18181b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark, html.dark body {
+  background: #000;
+  color: #fafafa;
+}
+
+/* ============================================================
+   READABILITY GUARDRAILS — minimum contrast for body text
+   in both themes. Designers can still use full zinc scale,
+   but the ramps that fail WCAG AA on the page background
+   are pulled inward.
+   ============================================================ */
+
+/* LIGHT MODE: text-zinc-300/400 on white = ~2:1 contrast → bump darker */
+html:not(.dark) [class*="text-zinc-300"]:not(.bg-black *):not(.bg-zinc-900 *):not(.bg-zinc-800 *):not(.bg-zinc-950 *) { color: #52525b !important; } /* zinc-600 */
+html:not(.dark) [class*="text-zinc-400"]:not(.bg-black *):not(.bg-zinc-900 *):not(.bg-zinc-800 *):not(.bg-zinc-950 *) { color: #52525b !important; } /* zinc-600 */
+html:not(.dark) [class*="text-zinc-500"]:not(.bg-black *):not(.bg-zinc-900 *):not(.bg-zinc-800 *):not(.bg-zinc-950 *) { color: #3f3f46 !important; } /* zinc-700 */
+
+/* DARK MODE: text-zinc-600/700/800/900 on black = invisible → bump lighter */
+html.dark [class*="text-zinc-900"]:not(.bg-white *):not(.bg-zinc-50 *):not(.bg-zinc-100 *) { color: #fafafa !important; }
+html.dark [class*="text-zinc-800"]:not(.bg-white *):not(.bg-zinc-50 *):not(.bg-zinc-100 *) { color: #f4f4f5 !important; }
+html.dark [class*="text-zinc-700"]:not(.bg-white *):not(.bg-zinc-50 *):not(.bg-zinc-100 *) { color: #d4d4d8 !important; }
+html.dark [class*="text-zinc-600"]:not(.bg-white *):not(.bg-zinc-50 *):not(.bg-zinc-100 *) { color: #a1a1aa !important; }
+
+/* Body-default colour for elements without an explicit text- class */
+html:not(.dark) p, html:not(.dark) span, html:not(.dark) div, html:not(.dark) li {
+  /* inherits #18181b from html */
+}
+
+/* Larger tap-target focus rings for accessibility (orange) */
+*:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Form controls — make sure text is always readable in both themes */
+input, select, textarea, button {
+  color: inherit;
+}
+input, textarea {
+  background-color: transparent;
+}
+input::placeholder, textarea::placeholder {
+  color: #71717a; /* zinc-500 */
+  opacity: 1;
+}
+html.dark input::placeholder, html.dark textarea::placeholder {
+  color: #a1a1aa; /* zinc-400 */
+}
+/* Native dropdown options — force readable colors instead of system defaults */
+select { color: #18181b; }
+option { background: #ffffff; color: #18181b; }
+html.dark select { color: #fafafa; }
+html.dark option { background: #18181b; color: #fafafa; }
+
+/* Any element using bg-white without an explicit text colour stays readable in dark mode */
+html.dark .bg-white { color: #18181b; }
+/* Force light-coloured text that lives inside a white panel to flip dark in dark mode */
+html.dark .bg-white .text-white,
+html.dark .bg-white .text-zinc-50,
+html.dark .bg-white .text-zinc-100,
+html.dark .bg-white .text-zinc-200,
+html.dark .bg-white .text-zinc-300,
+html.dark .bg-white .text-zinc-400 {
+  color: #18181b !important;
+}
+
+[dir="rtl"] {
+  font-family: 'Noto Kufi Arabic', 'Inter', system-ui, sans-serif;
+}
+
+/* ============================================================
+   DARK THEME = ONLY BLACK + ORANGE
+   Neutralize every non-orange hue to zinc/black, route accents
+   to orange. Light theme is untouched.
+   ============================================================ */
+html.dark [class*="bg-red-"],     html.dark [class*="bg-rose-"],
+html.dark [class*="bg-pink-"],    html.dark [class*="bg-fuchsia-"],
+html.dark [class*="bg-purple-"],  html.dark [class*="bg-violet-"],
+html.dark [class*="bg-indigo-"],  html.dark [class*="bg-blue-"],
+html.dark [class*="bg-sky-"],     html.dark [class*="bg-cyan-"],
+html.dark [class*="bg-teal-"],    html.dark [class*="bg-emerald-"],
+html.dark [class*="bg-green-"],   html.dark [class*="bg-lime-"],
+html.dark [class*="bg-yellow-"],  html.dark [class*="bg-amber-"] {
+  background-color: #18181b !important;
+}
+html.dark [class*="bg-red-50"],   html.dark [class*="bg-rose-50"],
+html.dark [class*="bg-pink-50"],  html.dark [class*="bg-fuchsia-50"],
+html.dark [class*="bg-purple-50"],html.dark [class*="bg-violet-50"],
+html.dark [class*="bg-indigo-50"],html.dark [class*="bg-blue-50"],
+html.dark [class*="bg-sky-50"],   html.dark [class*="bg-cyan-50"],
+html.dark [class*="bg-teal-50"],  html.dark [class*="bg-emerald-50"],
+html.dark [class*="bg-green-50"], html.dark [class*="bg-lime-50"],
+html.dark [class*="bg-yellow-50"],html.dark [class*="bg-amber-50"] {
+  background-color: #0a0a0a !important;
+}
+
+/* Text accents → orange */
+html.dark [class*="text-red-"],     html.dark [class*="text-rose-"],
+html.dark [class*="text-pink-"],    html.dark [class*="text-fuchsia-"],
+html.dark [class*="text-purple-"],  html.dark [class*="text-violet-"],
+html.dark [class*="text-indigo-"],  html.dark [class*="text-blue-"],
+html.dark [class*="text-sky-"],     html.dark [class*="text-cyan-"],
+html.dark [class*="text-teal-"],    html.dark [class*="text-emerald-"],
+html.dark [class*="text-green-"],   html.dark [class*="text-lime-"],
+html.dark [class*="text-yellow-"],  html.dark [class*="text-amber-"] {
+  color: #fb923c !important; /* orange-400 */
+}
+
+/* Borders → zinc */
+html.dark [class*="border-red-"],     html.dark [class*="border-rose-"],
+html.dark [class*="border-pink-"],    html.dark [class*="border-fuchsia-"],
+html.dark [class*="border-purple-"],  html.dark [class*="border-violet-"],
+html.dark [class*="border-indigo-"],  html.dark [class*="border-blue-"],
+html.dark [class*="border-sky-"],     html.dark [class*="border-cyan-"],
+html.dark [class*="border-teal-"],    html.dark [class*="border-emerald-"],
+html.dark [class*="border-green-"],   html.dark [class*="border-lime-"],
+html.dark [class*="border-yellow-"],  html.dark [class*="border-amber-"] {
+  border-color: #27272a !important;
+}
+
+/* Rings → orange */
+html.dark [class*="ring-red-"],     html.dark [class*="ring-rose-"],
+html.dark [class*="ring-pink-"],    html.dark [class*="ring-fuchsia-"],
+html.dark [class*="ring-purple-"],  html.dark [class*="ring-violet-"],
+html.dark [class*="ring-indigo-"],  html.dark [class*="ring-blue-"],
+html.dark [class*="ring-sky-"],     html.dark [class*="ring-cyan-"],
+html.dark [class*="ring-teal-"],    html.dark [class*="ring-emerald-"],
+html.dark [class*="ring-green-"],   html.dark [class*="ring-lime-"],
+html.dark [class*="ring-yellow-"],  html.dark [class*="ring-amber-"] {
+  --tw-ring-color: #f97316 !important;
+}
+
+/* Gradient stops → orange */
+html.dark [class*="from-red-"],     html.dark [class*="from-rose-"],
+html.dark [class*="from-pink-"],    html.dark [class*="from-fuchsia-"],
+html.dark [class*="from-purple-"],  html.dark [class*="from-violet-"],
+html.dark [class*="from-indigo-"],  html.dark [class*="from-blue-"],
+html.dark [class*="from-sky-"],     html.dark [class*="from-cyan-"],
+html.dark [class*="from-teal-"],    html.dark [class*="from-emerald-"],
+html.dark [class*="from-green-"],   html.dark [class*="from-lime-"],
+html.dark [class*="from-yellow-"],  html.dark [class*="from-amber-"] {
+  --tw-gradient-from: #f97316 var(--tw-gradient-from-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(249 115 22 / 0)) !important;
+}
+html.dark [class*="via-red-"],     html.dark [class*="via-rose-"],
+html.dark [class*="via-pink-"],    html.dark [class*="via-fuchsia-"],
+html.dark [class*="via-purple-"],  html.dark [class*="via-violet-"],
+html.dark [class*="via-indigo-"],  html.dark [class*="via-blue-"],
+html.dark [class*="via-sky-"],     html.dark [class*="via-cyan-"],
+html.dark [class*="via-teal-"],    html.dark [class*="via-emerald-"],
+html.dark [class*="via-green-"],   html.dark [class*="via-lime-"],
+html.dark [class*="via-yellow-"],  html.dark [class*="via-amber-"] {
+  --tw-gradient-via: #ea580c !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to, rgb(234 88 12 / 0)) !important;
+}
+html.dark [class*="to-red-"],     html.dark [class*="to-rose-"],
+html.dark [class*="to-pink-"],    html.dark [class*="to-fuchsia-"],
+html.dark [class*="to-purple-"],  html.dark [class*="to-violet-"],
+html.dark [class*="to-indigo-"],  html.dark [class*="to-blue-"],
+html.dark [class*="to-sky-"],     html.dark [class*="to-cyan-"],
+html.dark [class*="to-teal-"],    html.dark [class*="to-emerald-"],
+html.dark [class*="to-green-"],   html.dark [class*="to-lime-"],
+html.dark [class*="to-yellow-"],  html.dark [class*="to-amber-"] {
+  --tw-gradient-to: #c2410c var(--tw-gradient-to-position) !important;
+}
+
+/* Inline svg fills/strokes (lucide icons set color via currentColor — already covered) */
+html.dark [class*="fill-red-"],     html.dark [class*="fill-rose-"],
+html.dark [class*="fill-pink-"],    html.dark [class*="fill-fuchsia-"],
+html.dark [class*="fill-purple-"],  html.dark [class*="fill-violet-"],
+html.dark [class*="fill-indigo-"],  html.dark [class*="fill-blue-"],
+html.dark [class*="fill-sky-"],     html.dark [class*="fill-cyan-"],
+html.dark [class*="fill-teal-"],    html.dark [class*="fill-emerald-"],
+html.dark [class*="fill-green-"],   html.dark [class*="fill-lime-"],
+html.dark [class*="fill-yellow-"],  html.dark [class*="fill-amber-"] {
+  fill: #f97316 !important;
+}
+
+/* Hide scrollbar but keep functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

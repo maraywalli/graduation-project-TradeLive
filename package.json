@@ -1,0 +1,50 @@
+{
+  "name": "tradelive-pro",
+  "description": "Premium All-in-One Live Commerce & Marketplace Platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack -p 5000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p 5000 -H 0.0.0.0",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:setup": "tsx scripts/setup-db.ts"
+  },
+  "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "@types/leaflet": "^1.9.21",
+    "@types/pg": "^8.20.0",
+    "@vercel/speed-insights": "^2.0.0",
+    "drizzle-zod": "^0.8.3",
+    "jose": "^6.2.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.546.0",
+    "maplibre-gl": "^5.24.0",
+    "motion": "^12.23.24",
+    "next": "^15.0.3",
+    "openai": "^6.34.0",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
+    "pg": "^8.20.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "stripe": "^22.1.0",
+    "zod": "^4.3.6",
+    "zod-validation-error": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.21",
+    "dotenv": "^17.4.2",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}

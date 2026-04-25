@@ -1,0 +1,9 @@
+{
+  "name": "TradeLive Pro",
+  "description": "The Ultimate Global Marketplace and Live Streaming Platform for Modern Commerce.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

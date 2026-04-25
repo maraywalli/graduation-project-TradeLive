@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build output
+.next/
+out/
+build/
+dist/
+
+# misc
+.DS_Store
+*.log
+*.tsbuildinfo
+next-env.d.ts
+
+# environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# vercel
+.vercel
+
+# editor
+.vscode/
+.idea/
+
+# replit-specific
+.cache/
+.config/
+.upm/
+.local/
+.agents/
+.replit_integration_files/
+attached_assets/
+/tmp/

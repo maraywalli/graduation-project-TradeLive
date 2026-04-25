@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "regions": ["fra1"],
+  "functions": {
+    "app/api/ai/**/*": { "maxDuration": 30 },
+    "app/api/checkout/**/*": { "maxDuration": 15 },
+    "app/api/billing/**/*": { "maxDuration": 15 }
+  }
+}
