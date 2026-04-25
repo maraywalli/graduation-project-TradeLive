@@ -210,27 +210,22 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
   const [locating, setLocating] = useState(false);
 
   // Server-side upload — bypasses storage RLS so authenticated users can
-  // always upload regardless of bucket-policy state.
+  // always upload regardless of bucket-policy state. Each file is compressed
+  // client-side first (a typical 5 MB phone photo becomes ~150–250 KB),
+  // which is the difference between a 30s upload over a slow connection and
+  // a 1–2s one. Concurrency is capped at 2 so a user uploading 10 huge phone
+  // photos doesn't OOM mobile Safari decoding them all into canvases at
+  // once. Each request is also bounded by a 60s timeout.
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploading(true);
+    const fileArr = Array.from(files);
     const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      try {
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch('/api/items/upload', { method: 'POST', body: fd });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || !json.url) {
-          console.error('[upload] failed', json);
-          toast(json.error || `Upload failed (${res.status})`, 'error');
-          continue;
-        }
-        urls.push(json.url);
-      } catch (e: any) {
-        console.error('[upload] exception', e);
-        toast(e?.message || 'Upload failed', 'error');
-      }
+    const CONCURRENCY = 2;
+    for (let i = 0; i < fileArr.length; i += CONCURRENCY) {
+      const batch = fileArr.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(batch.map((file) => uploadOne(file, locale)));
+      for (const u of batchResults) if (u) urls.push(u);
     }
     if (urls.length) setForm((f) => ({ ...f, images: [...f.images, ...urls] }));
     setUploading(false);
@@ -427,6 +422,93 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
       </form>
     </div>
   );
+}
+
+/**
+ * Upload one (compressed) image. Returns the public URL on success, or null
+ * on failure (after surfacing a toast). Hard-bounded by a 60s timeout so a
+ * stuck connection can never freeze the form.
+ */
+async function uploadOne(file: File, locale: string): Promise<string | null> {
+  try {
+    const compressed = await compressImage(file).catch(() => file);
+    const fd = new FormData();
+    fd.append('file', compressed);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000);
+    const res = await fetch('/api/items/upload', {
+      method: 'POST',
+      body: fd,
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer));
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.url) {
+      console.error('[upload] failed', json);
+      toast(json.error || `Upload failed (${res.status})`, 'error');
+      return null;
+    }
+    return json.url as string;
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      toast(locale === 'ku' ? 'بارکردن کاتی بەسەرچوو' : 'Upload timed out — try a smaller image', 'error');
+    } else {
+      console.error('[upload] exception', e);
+      toast(e?.message || 'Upload failed', 'error');
+    }
+    return null;
+  }
+}
+
+/**
+ * Resize+re-encode an image client-side before upload.
+ *
+ * Why: phone photos are routinely 4–8 MB straight from the camera. Sending
+ * them over Replit's tunnelled dev preview (or any slow uplink) is the #1
+ * cause of "upload hangs". Re-encoding to JPEG @ 1600px max on the longest
+ * edge typically cuts the payload to 150–300 KB with no visible quality
+ * loss for marketplace thumbnails. Falls back to the original file if the
+ * browser can't decode it (e.g. HEIC on some devices) — the server-side
+ * upload route still accepts the original.
+ */
+async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  // Tiny images skip the round-trip entirely.
+  if (file.size < 200 * 1024) return file;
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('Read failed'));
+    r.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('Decode failed'));
+    im.src = dataUrl;
+  });
+
+  const ratio = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/jpeg', quality),
+  );
+  if (!blob) return file;
+  // Only swap when we actually saved bytes — avoids re-encoding tiny JPEGs
+  // larger than the original.
+  if (blob.size >= file.size) return file;
+  const ext = 'jpg';
+  const baseName = (file.name.replace(/\.[^.]+$/, '') || 'image').slice(0, 60);
+  return new File([blob], `${baseName}.${ext}`, { type: 'image/jpeg' });
 }
 
 function AIDescriptionButton({ form, setForm, locale }: { form: any; setForm: (f: any) => void; locale: string }) {
