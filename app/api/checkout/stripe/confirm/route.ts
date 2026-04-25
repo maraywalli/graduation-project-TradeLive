@@ -17,9 +17,10 @@ export async function POST(req: Request) {
   const { orderRef } = await req.json().catch(() => ({} as { orderRef?: string }));
   if (!orderRef) return NextResponse.json({ error: 'Missing orderRef' }, { status: 400 });
 
+  // Cast: `payments` isn't in the generated supabase types (typed `never`).
   // Verify ownership: only the buyer can confirm their own payment from the
   // browser. The webhook path skips this because Stripe is the caller.
-  const { data: payment } = await supabase
+  const { data: payment } = await (supabase as any)
     .from('payments')
     .select('id, stripe_payment_intent_id')
     .eq('user_id', user.id)

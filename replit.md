@@ -115,3 +115,8 @@ The deployed app was hitting 2–4s per request. Root causes & fixes:
 
 ## Color contrast guardrails
 - `app/globals.css` adds CSS rules that pull low-contrast `text-zinc-*` values inward in both themes (e.g. `text-zinc-300/400` on a white page becomes `zinc-600`; `text-zinc-700/800/900` on a black page becomes `zinc-200/100/50`). Background-aware via `:not(.bg-* *)` selectors so cards on dark surfaces keep their original ramp.
+
+## Build-time notes (Vercel / Next 15)
+- `lib/stripe.ts` exports a **lazy Proxy** for the Stripe client. Eager `new Stripe(...)` would crash `next build` whenever `STRIPE_SECRET_KEY` is missing from the build environment, because Next loads every route module during page-data collection. The Proxy defers instantiation until the first property access, so the build always succeeds; runtime still throws a clear error if the key is missing when a Stripe code path actually runs.
+- `lib/supabase/types.ts` does **not** include the `payments` or `subscriptions` tables (the generated types are stale). For now, the Stripe finalize helper (`lib/stripe-finalize.ts`) and the buyer-side confirm route (`app/api/checkout/stripe/confirm/route.ts`) cast the supabase client to `any` for those tables. To restore type safety, regenerate the supabase types (`npx supabase gen types typescript`) once schema changes settle.
+- Joined PostgREST queries (e.g. `items` with `seller:profiles!items_seller_id_fkey(...)`) lose Row typing — `app/u/[username]/page.tsx` uses `(item: any)` for the same reason.

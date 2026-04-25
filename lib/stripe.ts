@@ -1,22 +1,40 @@
 import Stripe from 'stripe';
 
-const secret = process.env.STRIPE_SECRET_KEY;
+/**
+ * Lazy Stripe client.
+ *
+ * Why a Proxy: Next.js loads every route module at build time to collect
+ * metadata, even routes that won't be hit. If we instantiate Stripe at
+ * import time, the build crashes whenever STRIPE_SECRET_KEY is missing
+ * from the build environment. The Proxy defers instantiation until the
+ * client is actually *used*, so the build always succeeds and runtime
+ * still fails fast (with a clear message) if the key is missing.
+ */
+let _client: Stripe | null = null;
 
-if (!secret) {
-  // Fail fast — silent test-key fallbacks have caused real-money mishaps in
-  // production. Better to surface the misconfiguration immediately.
-  throw new Error(
-    '[stripe] STRIPE_SECRET_KEY is not set. Set it via Replit secrets (or your Vercel env) before any Stripe code is loaded.',
-  );
+function getClient(): Stripe {
+  if (_client) return _client;
+  const secret = process.env.STRIPE_SECRET_KEY;
+  if (!secret) {
+    throw new Error(
+      '[stripe] STRIPE_SECRET_KEY is not set. Add it to Replit Secrets ' +
+        '(or your Vercel project env vars) before calling any Stripe code.',
+    );
+  }
+  _client = new Stripe(secret, { typescript: true });
+  return _client;
 }
 
-export const stripe = new Stripe(secret, {
-  typescript: true,
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getClient() as any, prop, receiver);
+  },
 });
 
 /** True when the configured key is a live (non-test) key. */
 export function isStripeLive(): boolean {
-  return !secret.startsWith('sk_test_');
+  const secret = process.env.STRIPE_SECRET_KEY || '';
+  return secret.length > 0 && !secret.startsWith('sk_test_');
 }
 
 // Stripe does not support IQD. We display IQD throughout the UI but charge

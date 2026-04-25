@@ -28,7 +28,10 @@ export type FinalizeStatus =
  * (or already ran on a prior invocation).
  */
 export async function finalizeCheckoutSession(sessionId: string): Promise<FinalizeStatus> {
-  const svc = createAdminClient();
+  // Cast to any: `payments` / `subscriptions` aren't in the generated
+  // Supabase types so the typed client returns `never`. Casting opts out
+  // of the type check for these helpers; runtime behavior is unchanged.
+  const svc = createAdminClient() as any;
 
   const { data: payment } = await svc
     .from('payments')
@@ -179,7 +182,7 @@ export async function finalizeBillingSession(
   sessionId: string,
   orderRef: string,
 ): Promise<FinalizeStatus> {
-  const svc = createAdminClient();
+  const svc = createAdminClient() as any;
   const composedRef = `${orderRef}__${sessionId}`;
 
   const { data: sub } = await svc
