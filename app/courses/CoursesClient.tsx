@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Plus, Clock, X, Loader2, Play } from 'lucide-react';
+import { GraduationCap, Plus, Clock, X, Loader2, Play, Upload } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
@@ -133,8 +133,26 @@ function Empty({ text }: { text: string }) {
 function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t, locale } = useI18n();
   const { user } = useAuth();
-  const [form, setForm] = useState({ title: '', description: '', price: '0', duration_minutes: '60', category: 'tech', content_url: '' });
+  const [form, setForm] = useState({ title: '', description: '', price: '0', duration_minutes: '60', category: 'tech', content_url: '', cover_url: '' });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/items/upload', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || 'Upload failed');
+      setForm((f) => ({ ...f, cover_url: json.url }));
+      toast(locale === 'ku' ? 'وێنە بارکرا' : 'Cover uploaded', 'success');
+    } catch (err: any) {
+      toast(err?.message || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +161,9 @@ function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
     const supabase = createClient();
     const { error } = await supabase.from('courses').insert({
       instructor_id: user.id,
-      title: form.title, description: form.description || null,
+      title: form.title,
+      description: form.description || null,
+      cover_url: form.cover_url || null,
       price: Number(form.price),
       duration_minutes: Number(form.duration_minutes),
       category: form.category,
@@ -163,6 +183,22 @@ function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1 block">
+              {locale === 'ku' ? 'وێنەی پەرتووک' : 'Course cover'}
+            </label>
+            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {locale === 'ku' ? 'وێنە بارکە' : 'Upload cover'}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
+            </label>
+            {form.cover_url && (
+              <div className="mt-3 rounded-2xl overflow-hidden w-full h-40 bg-zinc-100 dark:bg-zinc-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.cover_url} alt="Course cover" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
           <Field label={t.common.title} value={form.title} onChange={(v) => setForm({ ...form, title: v })} required />
           <Field label={t.common.description} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
           <div className="grid grid-cols-2 gap-3">

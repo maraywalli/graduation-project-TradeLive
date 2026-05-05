@@ -128,11 +128,25 @@ export function EventsClient({ events, myTickets }: { events: any[]; myTickets: 
 
       {showQr && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowQr(null)}>
-          <div className="bg-white p-6 rounded-3xl text-center" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-black text-zinc-900 mb-3">{showQr.event?.title}</h3>
-            <QRCodeSVG value={showQr.qr_code} size={240} />
-            <p className="text-xs font-mono text-zinc-500 mt-3 break-all max-w-[240px]">{showQr.qr_code}</p>
-            <button onClick={() => setShowQr(null)} className="mt-4 px-5 py-2 rounded-xl bg-zinc-200 text-zinc-900 font-black">{t.common.cancel}</button>
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-black text-zinc-900 dark:text-white mb-3">{showQr.event?.title}</h3>
+            <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/validate/${showQr.qr_code}`} size={240} />
+            <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mt-3 break-all max-w-[240px] mx-auto">
+              {typeof window !== 'undefined' ? `${window.location.origin}/events/validate/${showQr.qr_code}` : showQr.qr_code}
+            </p>
+            <div className="mt-4 grid gap-3">
+              <a
+                href={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/validate/${showQr.qr_code}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full justify-center py-3 rounded-xl bg-orange-500 text-white font-black hover:bg-orange-600"
+              >
+                {locale === 'ku' ? 'بەرەو پەڕەی تۆمارکردن بڕۆ' : 'Open validation page'}
+              </a>
+              <button onClick={() => setShowQr(null)} className="py-3 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-black">
+                {t.common.cancel}
+              </button>
+            </div>
           </div>
         </div>
       )}

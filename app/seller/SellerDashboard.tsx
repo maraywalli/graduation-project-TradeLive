@@ -397,6 +397,26 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
                 : 'Adding a location places your item on the marketplace map.'}
             </p>
           </div>
+
+          {pickerOpen && (
+            <LocationPicker
+              open={pickerOpen}
+              onClose={() => setPickerOpen(false)}
+              initial={form.latitude != null && form.longitude != null ? { latitude: form.latitude, longitude: form.longitude } : null}
+              locale={locale}
+              onPick={(result) => {
+                setForm((f) => ({
+                  ...f,
+                  latitude: result.latitude,
+                  longitude: result.longitude,
+                  location: result.address || f.location,
+                }));
+                setPickerOpen(false);
+                toast(locale === 'ku' ? 'شوێن هەڵبژێردرا' : 'Location selected', 'success');
+              }}
+            />
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <Select label={t.common.category} value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={CATEGORIES} />
             <Select label={t.common.condition} value={form.condition} onChange={(v) => setForm({ ...form, condition: v })} options={CONDITIONS} labels={(t.marketplace.condition as any)} />

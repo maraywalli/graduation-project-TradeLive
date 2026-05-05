@@ -81,8 +81,26 @@ function Stat({ label, value, icon }: { label: string; value: any; icon?: React.
 function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t, locale } = useI18n();
   const { user } = useAuth();
-  const [form, setForm] = useState({ name: '', slug: '', description: '', platform_fee: '5' });
+  const [form, setForm] = useState({ name: '', slug: '', description: '', platform_fee: '5', logo_url: '' });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/items/upload', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.url) throw new Error(json.error || 'Upload failed');
+      setForm((f) => ({ ...f, logo_url: json.url }));
+      toast(locale === 'ku' ? 'وێنە بارکرا' : 'Logo uploaded', 'success');
+    } catch (err: any) {
+      toast(err?.message || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,9 +110,12 @@ function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     const slug = form.slug || form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
     const fee = Math.max(1, Math.min(10, Number(form.platform_fee)));
     const { error } = await supabase.from('brands').insert({
-      owner_id: user.id, name: form.name, slug,
+      owner_id: user.id,
+      name: form.name,
+      slug,
       description: form.description || null,
       platform_fee: fee,
+      logo_url: form.logo_url || null,
     });
     setSaving(false);
     if (error) return toast(error.message, 'error');
@@ -110,6 +131,22 @@ function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1 block">
+              {locale === 'ku' ? 'شعار / وێنەی مارکە' : 'Brand logo'}
+            </label>
+            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {locale === 'ku' ? 'وێنە بارکە' : 'Upload logo'}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
+            </label>
+            {form.logo_url && (
+              <div className="mt-3 rounded-2xl overflow-hidden w-28 h-28 bg-zinc-100 dark:bg-zinc-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.logo_url} alt="Brand logo" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
           <Field label={locale === 'ku' ? 'ناوی مارکە' : 'Brand name'} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
           <Field label="Slug (URL)" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} />
           <Field label={t.common.description} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />

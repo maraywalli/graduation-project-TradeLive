@@ -15,15 +15,27 @@
 }
 
 html, body {
-  background: #fafafa;
-  color: #18181b;
+  background: radial-gradient(circle at top, #fff7ed, #f8fafc 35%, #f8fafc 100%);
+  color: #111827;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 html.dark, html.dark body {
-  background: #000;
-  color: #fafafa;
+  background: radial-gradient(circle at top, #020617, #09090b 40%, #050505 100%);
+  color: #f8fafc;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at top left, rgba(251, 146, 60, 0.10), transparent 20%), radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 18%);
+}
+
+button, input, textarea, select {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* ============================================================
