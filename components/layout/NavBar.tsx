@@ -23,18 +23,24 @@ export function NavBar() {
   useEffect(() => {
     const themeCookie = document.cookie.match(/theme=(dark|light)/)?.[1] as 'dark' | 'light' | undefined;
     const vmCookie = document.cookie.match(/view_mode=(bento|classic)/)?.[1] as 'classic' | 'bento' | undefined;
-    setTheme(themeCookie || 'dark');
+    setTheme(themeCookie || 'light');
     setViewMode(vmCookie || 'classic');
   }, []);
 
-  // Cart count: subscribe + on demand refetch
+  // Cart count: cached + subscribe + on demand refetch
   useEffect(() => {
     if (!user) { setCartCount(0); return; }
     const sb = createClient();
     const fetchCount = async () => {
       const { count } = await sb.from('cart_items').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
-      setCartCount(count || 0);
+      const newCount = count || 0;
+      setCartCount(newCount);
+      localStorage.setItem('cart_count', newCount.toString());
     };
+    // Load from cache first
+    const cached = localStorage.getItem('cart_count');
+    if (cached) setCartCount(parseInt(cached) || 0);
+    // Then fetch fresh
     fetchCount();
     const ch = sb.channel('cart-count').on('postgres_changes',
       { event: '*', schema: 'public', table: 'cart_items', filter: `user_id=eq.${user.id}` }, fetchCount).subscribe();

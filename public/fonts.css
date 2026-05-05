@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800;900&display=swap');
+
+/* Ensure Arabic/Kurdish fonts load properly */
+html, body {
+  font-family: 'Noto Kufi Arabic', 'Inter', system-ui, sans-serif;
+}
+
+/* RTL text styling */
+[dir="rtl"] {
+  font-family: 'Noto Kufi Arabic', 'Inter', system-ui, sans-serif;
+  text-align: right;
+}
+
+[dir="ltr"] {
+  font-family: 'Inter', 'Noto Kufi Arabic', system-ui, sans-serif;
+  text-align: left;
+}

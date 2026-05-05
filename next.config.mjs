@@ -58,6 +58,11 @@ const nextConfig = {
           { key: 'Content-Security-Policy', value: "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.repl.co https://*.vercel.app" },
           // Allow geolocation so sellers can pin items on the map.
           { key: 'Permissions-Policy', value: 'geolocation=*' },
+          // SEO headers
+          { key: 'X-UA-Compatible', value: 'IE=edge' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
     ];

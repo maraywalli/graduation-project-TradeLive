@@ -1,9 +1,15 @@
 import { cookies } from 'next/headers';
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { MarketplaceClient } from './_pages/MarketplaceClient';
 import { BentoHomeClient } from './_pages/BentoHomeClient';
 import { HomeSkeleton } from '@/components/skeletons/HomeSkeleton';
+
+export const metadata: Metadata = {
+  title: 'TradeLive Pro - بازاری ترەیدلایڤ | Buy & Sell Online',
+  description: 'کڕین و فرۆشین ئونلاین | لایڤ کۆمێرس | مارکێتی ترەیدلایڤ - Premium Marketplace Platform',
+};
 
 // Stream the markup instantly; the data-dependent inner component is wrapped
 // in <Suspense> so the user sees a skeleton while Supabase responds.
@@ -42,7 +48,7 @@ async function HomeContent({
     )
     .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(60);
+    .limit(100);
   if (q) itemsQ = itemsQ.ilike('title', `%${q}%`);
   if (cat && cat !== 'all') itemsQ = itemsQ.eq('category', cat);
 

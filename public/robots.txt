@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemaps
+Sitemap: https://tradelive.vercel.app/sitemap.xml
+
+# Crawl delay to prevent server overload
+Crawl-delay: 1

@@ -10,8 +10,8 @@ export default async function SellerPage() {
   if (!user) redirect('/login?next=/seller');
 
   const [items, orders, profile, brands] = await Promise.all([
-    supabase.from('items').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
-    supabase.from('orders').select('*, item:items(title, price)').eq('seller_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('items').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('orders').select('*, item:items(title, price)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(50),
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('brands').select('id, name, slug').eq('owner_id', user.id).order('name'),
   ]);

@@ -223,7 +223,7 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
     setUploading(true);
     const fileArr = Array.from(files);
     const urls: string[] = [];
-    const CONCURRENCY = 2;
+    const CONCURRENCY = 4;
     for (let i = 0; i < fileArr.length; i += CONCURRENCY) {
       const batch = fileArr.slice(i, i + CONCURRENCY);
       const batchResults = await Promise.all(batch.map((file) => uploadOne(file, locale)));
@@ -318,13 +318,12 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.common.description}</label>
-              <AIDescriptionButton form={form} setForm={setForm} locale={locale} />
             </div>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
-              placeholder={locale === 'ku' ? 'بنووسە یان دوگمەی AI داگرە بۆ نووسینی خۆکار' : 'Type or click AI to auto-fill'}
+              placeholder={locale === 'ku' ? 'بنووسە' : 'Type your description'}
               className="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -531,34 +530,6 @@ async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promis
   const ext = 'jpg';
   const baseName = (file.name.replace(/\.[^.]+$/, '') || 'image').slice(0, 60);
   return new File([blob], `${baseName}.${ext}`, { type: 'image/jpeg' });
-}
-
-function AIDescriptionButton({ form, setForm, locale }: { form: any; setForm: (f: any) => void; locale: string }) {
-  const [busy, setBusy] = useState(false);
-  const run = async () => {
-    if (!form.title?.trim()) {
-      toast(locale === 'ku' ? 'سەرەتا ناونیشانێک بنووسە' : 'Add a title first', 'error');
-      return;
-    }
-    setBusy(true);
-    const res = await fetch('/api/ai/generate-description', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: form.title, notes: form.description, category: form.category, condition: form.condition, locale }),
-    });
-    const json = await res.json();
-    setBusy(false);
-    if (!res.ok) return toast(json.error || 'AI failed', 'error');
-    setForm({ ...form, description: json.description });
-    toast(locale === 'ku' ? 'وەسف دروستکرا' : 'Description generated');
-  };
-  return (
-    <button type="button" onClick={run} disabled={busy}
-      className="text-[10px] font-black px-2 py-1 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white flex items-center gap-1 hover:opacity-90 disabled:opacity-50">
-      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-      {locale === 'ku' ? 'AI وەسف' : 'AI describe'}
-    </button>
-  );
 }
 
 function AIStudioImageButton({ form, setForm, locale }: { form: any; setForm: (f: any) => void; locale: string }) {

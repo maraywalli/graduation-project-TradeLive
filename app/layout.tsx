@@ -11,8 +11,41 @@ import type { Locale } from '@/lib/i18n/dictionaries';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TradeLive Pro',
-  description: 'Premium All-in-One Live Commerce & Marketplace Platform',
+  title: 'TradeLive Pro - مارکێت ئونلاین | Marketplace',
+  description: 'Premium All-in-One Live Commerce & Marketplace Platform | مارکێتی ترەیدلایڤ - بازاری ئونلاین، فرۆشین و کڕین، لایڤ کۆمێرس',
+  keywords: ['marketplace', 'trade live', 'live commerce', 'online store', 'مارکێت', 'ترەیدلایڤ', 'بازار', 'فرۆشین ئونلاین', 'کڕین و فرۆشین', 'لایڤ کۆمێرس'],
+  openGraph: {
+    type: 'website',
+    locale: 'ku_IQ',
+    url: 'https://tradelive.vercel.app',
+    siteName: 'TradeLive Pro',
+    title: 'TradeLive Pro - بازاری ترەیدلایڤ',
+    description: 'مارکێتی بڕینی و فرۆشین | لایڤ کۆمێرس | Buy & Sell Online',
+    images: [
+      {
+        url: 'https://tradelive.vercel.app/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'TradeLive Pro Marketplace',
+      }
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TradeLive Pro - مارکێت',
+    description: 'بازاری ئونلاین | Live Commerce Platform',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    languages: {
+      'ku': 'https://tradelive.vercel.app',
+      'en': 'https://tradelive.vercel.app?lang=en',
+      'ar': 'https://tradelive.vercel.app?lang=ar',
+    },
+  },
 };
 
 export default async function RootLayout({
