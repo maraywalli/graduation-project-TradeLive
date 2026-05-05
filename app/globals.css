@@ -1,29 +1,49 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #fff7ed;
-  --color-brand-100: #ffedd5;
-  --color-brand-200: #fed7aa;
-  --color-brand-300: #fdba74;
-  --color-brand-400: #fb923c;
-  --color-brand-500: #f97316;
-  --color-brand-600: #ea580c;
-  --color-brand-700: #c2410c;
-  --color-brand-800: #9a3412;
-  --color-brand-900: #7c2d12;
-  --font-sans: 'Inter', 'Noto Kufi Arabic', system-ui, sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #4f46e5;
+  --color-brand-600: #4338ca;
+  --color-brand-700: #3730a3;
+  --color-brand-800: #312e81;
+  --color-brand-900: #312e81;
+  --font-sans: 'Inter', 'Noto Sans', system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-sans);
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-strong: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #e2e8f0;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
 }
 
 html, body {
-  background: radial-gradient(circle at top, #fff7ed, #f8fafc 35%, #f8fafc 100%);
-  color: #111827;
+  background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.10), transparent 24%),
+              radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.08), transparent 20%),
+              #f8fafc;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 html.dark, html.dark body {
-  background: radial-gradient(circle at top, #020617, #09090b 40%, #050505 100%);
-  color: #f8fafc;
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.10), transparent 24%),
+              radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.08), transparent 20%),
+              #020617;
+  color: #e2e8f0;
 }
 
 body::before {
@@ -31,7 +51,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(circle at top left, rgba(251, 146, 60, 0.10), transparent 20%), radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 18%);
+  background-image: radial-gradient(circle at top left, rgba(79, 70, 229, 0.08), transparent 20%), radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.05), transparent 18%);
 }
 
 button, input, textarea, select {

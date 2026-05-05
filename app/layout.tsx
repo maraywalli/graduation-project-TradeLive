@@ -55,12 +55,12 @@ export default async function RootLayout({
 }) {
   const cookieStore = await cookies();
   const localeCookie = (cookieStore.get('locale')?.value as Locale) || 'ku';
-  const themeCookie = cookieStore.get('theme')?.value || 'dark';
+  const themeCookie = cookieStore.get('theme')?.value || 'light';
   const dir = localeCookie === 'ku' ? 'rtl' : 'ltr';
 
   return (
     <html lang={localeCookie} dir={dir} className={themeCookie === 'light' ? '' : 'dark'} suppressHydrationWarning>
-      <body className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-50">
+      <body className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50">
         <I18nProvider initialLocale={localeCookie}>
           <AuthProvider>
             <NavBar />

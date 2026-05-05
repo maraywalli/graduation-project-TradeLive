@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Package, ShoppingBag, DollarSign, Star, Edit, Trash2, X, Upload, Loader2, Sparkles, Wand2, Clock, MapPin } from 'lucide-react';
+import { Plus, Package, ShoppingBag, DollarSign, Star, Edit, Trash2, X, Upload, Loader2, Clock, MapPin } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
@@ -423,11 +423,11 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.common.image}</label>
-              <AIStudioImageButton form={form} setForm={setForm} locale={locale} />
-            </div>
-            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700">
+            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
+              <Upload className="w-4 h-4" />
+              {locale === 'ku' ? 'وێنە بارکە' : 'Upload images'}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
+            </label>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {locale === 'ku' ? 'وێنە بارکە' : 'Upload images'}
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
@@ -550,45 +550,6 @@ async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promis
   const ext = 'jpg';
   const baseName = (file.name.replace(/\.[^.]+$/, '') || 'image').slice(0, 60);
   return new File([blob], `${baseName}.${ext}`, { type: 'image/jpeg' });
-}
-
-function AIStudioImageButton({ form, setForm, locale }: { form: any; setForm: (f: any) => void; locale: string }) {
-  const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState('');
-  const [pct, setPct] = useState(0);
-
-  const onPick = async (file: File | null) => {
-    if (!file) return;
-    setBusy(true);
-    setStage(locale === 'ku' ? 'بارکردنی مۆدێل' : 'Loading model');
-    setPct(0);
-    try {
-      const { generateStudioShot } = await import('@/lib/studio-shot');
-      const blob = await generateStudioShot(file, (s, p) => { setStage(s); setPct(p); });
-      const fd = new FormData();
-      fd.append('image', blob, 'studio.jpg');
-      const res = await fetch('/api/ai/generate-product-image', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Upload failed');
-      setForm({ ...form, images: [...form.images, json.url] });
-      toast(locale === 'ku' ? 'وێنەی ستۆدیۆ زیادکرا' : 'Studio shot added');
-    } catch (e: any) {
-      toast(e.message || 'Studio shot failed', 'error');
-    } finally {
-      setBusy(false);
-      setStage('');
-      setPct(0);
-    }
-  };
-
-  return (
-    <label className="text-[10px] font-black px-2 py-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white flex items-center gap-1 hover:opacity-90 cursor-pointer">
-      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-      {busy ? `${stage} ${pct}%` : (locale === 'ku' ? 'AI ستۆدیۆ' : 'AI studio shot')}
-      <input type="file" accept="image/*" className="hidden" disabled={busy}
-        onChange={(e) => { const f = e.target.files?.[0]; onPick(f || null); e.target.value=''; }} />
-    </label>
-  );
 }
 
 function Field({ label, value, onChange, type = 'text', required }: { label: string; value: string; onChange: (v: string) => void; type?: string; required?: boolean }) {

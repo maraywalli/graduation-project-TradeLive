@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Plus, ShieldCheck, Star, X, Loader2 } from 'lucide-react';
+import { Building2, Plus, ShieldCheck, Star, X, Loader2, Upload } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
