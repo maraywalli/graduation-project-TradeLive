@@ -3,17 +3,18 @@ import { createAdminClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 type Props = {
-  params: {
+  params: Promise<{
     ticket: string;
-  };
+  }>;
 };
 
 export default async function TicketValidationPage({ params }: Props) {
+  const { ticket: ticketCode } = await params;
   const supabase = createAdminClient();
   const { data: ticket, error } = await supabase
     .from('tickets')
     .select('id,status,event:events(title,venue,starts_at)')
-    .eq('qr_code', params.ticket)
+    .eq('qr_code', ticketCode)
     .single();
 
   let pageStatus: 'valid' | 'used' | 'invalid' | 'refunded' = 'invalid';
@@ -65,7 +66,7 @@ export default async function TicketValidationPage({ params }: Props) {
         <div className="p-8 space-y-4">
           <div className="rounded-3xl bg-zinc-100 dark:bg-zinc-800 p-5">
             <p className="text-sm font-bold">Ticket code</p>
-            <p className="mt-2 text-xs font-mono break-all text-zinc-600 dark:text-zinc-300">{params.ticket}</p>
+            <p className="mt-2 text-xs font-mono break-all text-zinc-600 dark:text-zinc-300">{ticketCode}</p>
           </div>
           <div className="rounded-3xl bg-zinc-100 dark:bg-zinc-800 p-5">
             <p className="text-sm font-bold">Result</p>
