@@ -424,10 +424,6 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
 
           <div>
             <label className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
-              <Upload className="w-4 h-4" />
-              {locale === 'ku' ? 'وێنە بارکە' : 'Upload images'}
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
-            </label>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {locale === 'ku' ? 'وێنە بارکە' : 'Upload images'}
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
