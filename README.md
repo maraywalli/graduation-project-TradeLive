@@ -46,6 +46,7 @@ git push -u origin main
    - `db/free_post_limit.sql`
    - `db/06_drop_livestreams.sql` (drops the unused legacy live tables)
    - `db/08_items_geo_index.sql` (partial index for the map view)
+   - `db/09_cart_items.sql` (cart table, indexes, and RLS policies)
 3. In **Storage**, confirm these buckets exist (created by `schema.sql`):
    `item-images`, `avatars`, `course-content`, `brand-logos`, `event-covers`, `course-covers`.
 4. Copy `Project URL`, `anon` key, `service_role` key, and the pooled DB connection string.

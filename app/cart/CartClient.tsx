@@ -3,24 +3,55 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingBag, Trash2, Plus, Minus, Loader2, ArrowRight, CreditCard, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, Loader2, ArrowRight, CreditCard, MessageCircle, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { toast } from '@/components/ui/Toaster';
+
+type CartLine = {
+  id: string;
+  quantity: number;
+  item: {
+    id: string;
+    title: string;
+    price: number;
+    currency: string;
+    images?: string[] | null;
+    seller?: {
+      id: string;
+      username: string | null;
+    } | null;
+  };
+};
 
 export function CartClient() {
   const { t, locale } = useI18n();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<CartLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const tx = (en: string, ku: string) => (locale === 'ku' ? ku : en);
 
   const refresh = async () => {
-    const res = await fetch('/api/cart');
-    const json = await res.json();
-    setItems(json.items || []);
-    setLoading(false);
+    try {
+      setError(null);
+      const res = await fetch('/api/cart', { cache: 'no-store' });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        router.push('/login?next=/cart');
+        return;
+      }
+      if (!res.ok) throw new Error(json?.error || 'Failed to load cart');
+      setItems((json.items || []).filter((line: CartLine) => line.item));
+    } catch (e: any) {
+      setItems([]);
+      setError(e?.message || 'Failed to load cart');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -34,23 +65,43 @@ export function CartClient() {
 
   const setQty = async (id: string, q: number) => {
     setBusy(id);
-    await fetch('/api/cart', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, quantity: q }) });
-    setBusy(null);
-    await refresh();
-    window.dispatchEvent(new CustomEvent('cart:changed'));
+    try {
+      const res = await fetch('/api/cart', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, quantity: q }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Failed to update cart');
+      await refresh();
+      window.dispatchEvent(new CustomEvent('cart:changed'));
+    } catch (e: any) {
+      toast(e?.message || tx('Failed to update cart', 'نوێکردنەوەی سەبەتە سەرکەوتوو نەبوو'));
+    } finally {
+      setBusy(null);
+    }
   };
   const remove = async (id: string) => {
     setBusy(id);
-    await fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-    setBusy(null);
-    await refresh();
-    window.dispatchEvent(new CustomEvent('cart:changed'));
+    try {
+      const res = await fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Failed to remove item');
+      await refresh();
+      window.dispatchEvent(new CustomEvent('cart:changed'));
+    } catch (e: any) {
+      toast(e?.message || tx('Failed to remove item', 'سڕینەوەی کاڵا سەرکەوتوو نەبوو'));
+    } finally {
+      setBusy(null);
+    }
   };
   const clear = async () => {
-    if (!confirm(locale === 'ku' ? 'سەبەتە بە تەواوی بسڕەوە؟' : 'Empty the entire cart?')) return;
-    await fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: '__all__' }) });
-    await refresh();
-    window.dispatchEvent(new CustomEvent('cart:changed'));
+    if (!confirm(tx('Empty the entire cart?', 'سەبەتە بە تەواوی بسڕەوە؟'))) return;
+    try {
+      const res = await fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: '__all__' }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Failed to clear cart');
+      await refresh();
+      window.dispatchEvent(new CustomEvent('cart:changed'));
+    } catch (e: any) {
+      toast(e?.message || tx('Failed to clear cart', 'سڕینەوەی سەبەتە سەرکەوتوو نەبوو'));
+    }
   };
 
   const subtotal = items.reduce((s, ci) => s + Number(ci.item?.price || 0) * ci.quantity, 0);
@@ -68,6 +119,13 @@ export function CartClient() {
           <button onClick={clear} className="text-sm font-bold text-red-500 hover:text-red-600">{locale === 'ku' ? 'سڕینەوەی هەموو' : 'Clear all'}</button>
         )}
       </div>
+
+      {error && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="text-center py-20 text-zinc-500">

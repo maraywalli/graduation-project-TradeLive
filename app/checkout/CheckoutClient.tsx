@@ -42,13 +42,13 @@ export function CheckoutClient() {
       .eq('user_id', user.id)
       .then(({ data, error }) => {
         if (error) setErr(error.message);
-        else setLines((data as any) || []);
+        else setLines(((data as any) || []).filter((line: CartLine) => line.item));
         setLoading(false);
       });
   }, [user, router]);
 
   const totalIqd = (lines || []).reduce(
-    (s, l) => s + Number(l.item.price) * l.quantity,
+    (s, l) => s + Number(l.item?.price || 0) * l.quantity,
     0,
   );
 

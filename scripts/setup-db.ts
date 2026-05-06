@@ -31,6 +31,7 @@ const FILES = [
   'db/free_post_limit.sql',
   'db/06_drop_livestreams.sql',
   'db/08_items_geo_index.sql',
+  'db/09_cart_items.sql',
 ];
 
 async function main() {

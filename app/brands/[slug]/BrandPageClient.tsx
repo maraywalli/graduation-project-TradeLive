@@ -128,7 +128,7 @@ function ProductCard({
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      router.push(`/login?redirect=/brands/${encodeURIComponent(brandSlug)}`);
+      router.push(`/login?next=/brands/${encodeURIComponent(brandSlug)}`);
       return;
     }
     if (ownItem) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag, Check, Loader2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
@@ -11,13 +11,14 @@ export function AddToCartButton({ itemId, compact = false, label }: { itemId: st
   const { locale } = useI18n();
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
 
   const add = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user) { router.push('/login'); return; }
+    if (!user) { router.push(`/login?next=${encodeURIComponent(pathname || '/')}`); return; }
     setLoading(true);
     const res = await fetch('/api/cart', {
       method: 'POST',
