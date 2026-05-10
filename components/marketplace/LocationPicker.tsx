@@ -14,6 +14,7 @@ type Props = {
 };
 
 const ERBIL: [number, number] = [44.0091, 36.1911];
+const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -42,6 +43,9 @@ export default function LocationPicker({ open, onClose, onPick, initial, locale 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const googleMapRef = useRef<any>(null);
+  const googleMarkerRef = useRef<any>(null);
+  const googleGeocoderRef = useRef<any>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     initial?.latitude != null && initial?.longitude != null
       ? { lat: initial.latitude, lng: initial.longitude }
@@ -60,6 +64,55 @@ export default function LocationPicker({ open, onClose, onPick, initial, locale 
   useEffect(() => {
     if (!open || !containerRef.current) return;
     const start: [number, number] = coords ? [coords.lng, coords.lat] : ERBIL;
+
+    if (GOOGLE_MAPS_KEY) {
+      let alive = true;
+      void loadGoogleMaps(GOOGLE_MAPS_KEY).then((google) => {
+        if (!alive || !containerRef.current) return;
+        const center = { lat: start[1], lng: start[0] };
+        const map = new google.maps.Map(containerRef.current, {
+          center,
+          zoom: coords ? 13 : 11,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+        });
+        const marker = new google.maps.Marker({
+          map,
+          position: center,
+          draggable: true,
+        });
+        const geocoder = new google.maps.Geocoder();
+
+        const update = (lat: number, lng: number) => {
+          marker.setPosition({ lat, lng });
+          setCoords({ lat, lng });
+          void reverseGeocode(lat, lng, google, geocoder).then((a) => a && setAddress(a));
+        };
+
+        map.addListener('click', (e: any) => {
+          if (!e.latLng) return;
+          update(e.latLng.lat(), e.latLng.lng());
+        });
+        marker.addListener('dragend', () => {
+          const pos = marker.getPosition();
+          if (pos) update(pos.lat(), pos.lng());
+        });
+
+        googleMapRef.current = map;
+        googleMarkerRef.current = marker;
+        googleGeocoderRef.current = geocoder;
+
+        if (coords) void reverseGeocode(coords.lat, coords.lng, google, geocoder).then((a) => a && setAddress(a));
+      });
+      return () => {
+        alive = false;
+        googleMapRef.current = null;
+        googleMarkerRef.current = null;
+        googleGeocoderRef.current = null;
+      };
+    }
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: STYLE,
@@ -111,7 +164,10 @@ export default function LocationPicker({ open, onClose, onPick, initial, locale 
         setCoords({ lat: latitude, lng: longitude });
         markerRef.current?.setLngLat([longitude, latitude]);
         mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 14 });
-        void reverseGeocode(latitude, longitude).then((a) => a && setAddress(a));
+        googleMarkerRef.current?.setPosition({ lat: latitude, lng: longitude });
+        googleMapRef.current?.setCenter({ lat: latitude, lng: longitude });
+        googleMapRef.current?.setZoom(14);
+        void reverseGeocode(latitude, longitude, undefined, googleGeocoderRef.current).then((a) => a && setAddress(a));
         setBusy(false);
       },
       () => setBusy(false),
@@ -124,6 +180,20 @@ export default function LocationPicker({ open, onClose, onPick, initial, locale 
     if (!search.trim()) return;
     setSearching(true);
     try {
+      if (GOOGLE_MAPS_KEY) {
+        const google = await loadGoogleMaps(GOOGLE_MAPS_KEY);
+        const geocoder = googleGeocoderRef.current || new google.maps.Geocoder();
+        const hit = await geocodeAddress(search, google, geocoder);
+        if (hit) {
+          const { lat, lng, address: label } = hit;
+          setCoords({ lat, lng });
+          setAddress(label || search);
+          googleMarkerRef.current?.setPosition({ lat, lng });
+          googleMapRef.current?.setCenter({ lat, lng });
+          googleMapRef.current?.setZoom(14);
+        }
+        return;
+      }
       const r = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(search)}`,
         { headers: { 'Accept-Language': isKu ? 'ku,en' : 'en' } },
@@ -241,8 +311,18 @@ export default function LocationPicker({ open, onClose, onPick, initial, locale 
  * supplied automatically by the browser. We keep this best-effort: an
  * empty result just means the user sees coordinates instead of a name.
  */
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+async function reverseGeocode(lat: number, lng: number, googleApi?: any, geocoder?: any): Promise<string | null> {
   try {
+    if (GOOGLE_MAPS_KEY) {
+      const google = googleApi || await loadGoogleMaps(GOOGLE_MAPS_KEY);
+      const g = geocoder || new google.maps.Geocoder();
+      const result = await new Promise<any>((resolve) => {
+        g.geocode({ location: { lat, lng } }, (results: any, status: string) => {
+          resolve(status === 'OK' ? results?.[0] : null);
+        });
+      });
+      return result?.formatted_address || null;
+    }
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`,
     );
@@ -251,4 +331,37 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
   } catch {
     return null;
   }
+}
+
+function loadGoogleMaps(key: string): Promise<any> {
+  const w = window as any;
+  if (w.google?.maps) return Promise.resolve(w.google);
+  const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]');
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve(w.google), { once: true });
+      existing.addEventListener('error', reject, { once: true });
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleMaps = 'true';
+    script.onload = () => resolve(w.google);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function geocodeAddress(address: string, google: any, geocoder: any): Promise<{ lat: number; lng: number; address?: string } | null> {
+  return new Promise((resolve) => {
+    geocoder.geocode({ address }, (results: any, status: string) => {
+      const hit = status === 'OK' ? results?.[0] : null;
+      const loc = hit?.geometry?.location;
+      if (!loc) return resolve(null);
+      resolve({ lat: loc.lat(), lng: loc.lng(), address: hit.formatted_address });
+    });
+  });
 }

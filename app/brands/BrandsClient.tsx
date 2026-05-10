@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
+import { uploadImageFast } from '@/lib/upload-fast';
 
 export function BrandsClient({ brands }: { brands: any[] }) {
   const { t, locale } = useI18n();
@@ -82,21 +83,25 @@ function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const [form, setForm] = useState({ name: '', slug: '', description: '', platform_fee: '5', logo_url: '' });
+  const [logoPreview, setLogoPreview] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const uploadImage = async (file: File) => {
+    const preview = URL.createObjectURL(file);
+    setLogoPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return preview;
+    });
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/items/upload', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok || !json.url) throw new Error(json.error || 'Upload failed');
-      setForm((f) => ({ ...f, logo_url: json.url }));
+      const url = await uploadImageFast(file, { maxEdge: 900, quality: 0.8 });
+      URL.revokeObjectURL(preview);
+      setLogoPreview('');
+      setForm((f) => ({ ...f, logo_url: url }));
       toast(locale === 'ku' ? 'وێنە بارکرا' : 'Logo uploaded', 'success');
     } catch (err: any) {
-      toast(err?.message || 'Upload failed', 'error');
+      toast(err?.name === 'AbortError' ? (locale === 'ku' ? 'بارکردن کاتی بەسەرچوو' : 'Upload timed out') : (err?.message || 'Upload failed'), 'error');
     } finally {
       setUploading(false);
     }
@@ -140,10 +145,10 @@ function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
               {locale === 'ku' ? 'وێنە بارکە' : 'Upload logo'}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
             </label>
-            {form.logo_url && (
+            {(logoPreview || form.logo_url) && (
               <div className="mt-3 rounded-2xl overflow-hidden w-28 h-28 bg-zinc-100 dark:bg-zinc-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={form.logo_url} alt="Brand logo" className="w-full h-full object-cover" />
+                <img src={logoPreview || form.logo_url} alt="Brand logo" className="w-full h-full object-cover" />
               </div>
             )}
           </div>
@@ -151,7 +156,7 @@ function BrandFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <Field label="Slug (URL)" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} />
           <Field label={t.common.description} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
           <Field label={`${t.brands.platformFee} (1-10%)`} type="number" value={form.platform_fee} onChange={(v) => setForm({ ...form, platform_fee: v })} required />
-          <button disabled={saving} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+          <button disabled={saving || uploading} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {t.common.save}
           </button>

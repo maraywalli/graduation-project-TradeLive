@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Truck, Plus, MapPin, Clock, X, Loader2, Navigation } from 'lucide-react';
+import { Truck, Plus, MapPin, Clock, X, Loader2, Navigation, PackageCheck } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
 
 const DeliveryMap = dynamic(() => import('@/components/delivery/DeliveryMap').then((m) => m.DeliveryMap), { ssr: false });
+const LocationPicker = dynamic(() => import('@/components/marketplace/LocationPicker'), { ssr: false });
 
 const DRIVERS = [
   { name: 'Sarbast K.', phone: '+964 750 100 1001' },
@@ -220,62 +221,108 @@ function StatusBadge({ status }: { status: string }) {
 function DeliveryFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t, locale } = useI18n();
   const { user } = useAuth();
-  const [form, setForm] = useState({ pickup_address: '', drop_address: '' });
-  const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [selectedCartIds, setSelectedCartIds] = useState<string[]>([]);
+  const [cartLoading, setCartLoading] = useState(true);
+  const [form, setForm] = useState({ drop_address: '' });
   const [dropCoords, setDropCoords] = useState<[number, number] | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [geocoding, setGeocoding] = useState<'pickup' | 'drop' | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
 
-  // Use OpenStreetMap Nominatim for free address-to-coords lookup
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/cart', { cache: 'no-store' });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.error || 'Failed to load cart');
+        if (cancelled) return;
+        const lines = (json.items || []).filter((line: any) => line.item);
+        setCartItems(lines);
+        setSelectedCartIds(lines.map((line: any) => line.id));
+      } catch (e: any) {
+        if (!cancelled) toast(e?.message || 'Failed to load cart', 'error');
+      } finally {
+        if (!cancelled) setCartLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Best-effort pickup lookup for cart items that do not already have seller
+  // coordinates. Destination is chosen explicitly with the map picker.
   const geocode = async (q: string): Promise<[number, number] | null> => {
     if (!q.trim()) return null;
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
-        headers: { 'Accept-Language': locale },
-      });
-      const data = await res.json();
-      if (data?.[0]) return [Number(data[0].lat), Number(data[0].lon)];
+      const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (key) {
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&key=${encodeURIComponent(key)}&language=${locale === 'ku' ? 'ku' : 'en'}`);
+        const data = await res.json();
+        const loc = data?.results?.[0]?.geometry?.location;
+        if (loc) return [Number(loc.lat), Number(loc.lng)];
+      } else {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
+          headers: { 'Accept-Language': locale },
+        });
+        const data = await res.json();
+        if (data?.[0]) return [Number(data[0].lat), Number(data[0].lon)];
+      }
     } catch {}
     return null;
   };
 
-  const lookupPickup = async () => {
-    if (!form.pickup_address.trim()) return;
-    setGeocoding('pickup');
-    const c = await geocode(form.pickup_address);
-    setGeocoding(null);
-    if (c) setPickupCoords(c);
-    else toast(locale === 'ku' ? 'شوێن نەدۆزرایەوە' : 'Location not found', 'error');
+  const pickupAddressFor = (line: any) => {
+    const item = line.item || {};
+    return String(item.location || item.description || '').trim();
   };
-  const lookupDrop = async () => {
-    if (!form.drop_address.trim()) return;
-    setGeocoding('drop');
-    const c = await geocode(form.drop_address);
-    setGeocoding(null);
-    if (c) setDropCoords(c);
-    else toast(locale === 'ku' ? 'شوێن نەدۆزرایەوە' : 'Location not found', 'error');
+
+  const selectedLines = cartItems.filter((line) => selectedCartIds.includes(line.id));
+
+  const toggleCartLine = (id: string) => {
+    setSelectedCartIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (selectedLines.length === 0) return toast(locale === 'ku' ? 'هیچ کاڵایەک هەڵنەبژێردراوە' : 'Select at least one cart item', 'error');
+    if (!dropCoords || !form.drop_address.trim()) return toast(locale === 'ku' ? 'شوێنی گەیاندن لەسەر نەخشە دیاری بکە' : 'Pick a destination on the map', 'error');
+
     setSaving(true);
     const supabase = createClient();
-    let pickup = pickupCoords || (await geocode(form.pickup_address));
-    let drop = dropCoords || (await geocode(form.drop_address));
-    if (!pickup) pickup = jitter(DEFAULT_CENTER, 2);
-    if (!drop) drop = jitter(DEFAULT_CENTER, 4);
-    const km = distanceKm(pickup, drop);
-    const cost = Math.round(2000 + km * 1500);
-    const eta = Math.max(5, Math.round(km * 8));
-    const { error } = await supabase.from('deliveries').insert({
-      user_id: user.id,
-      pickup_address: form.pickup_address,
-      drop_address: form.drop_address,
-      pickup_lat: pickup[0], pickup_lng: pickup[1],
-      drop_lat: drop[0], drop_lng: drop[1],
-      cost, eta_minutes: eta,
-    });
+    setGeocoding(true);
+    const rows = [];
+    for (const line of selectedLines) {
+      const item = line.item || {};
+      const pickupAddress = pickupAddressFor(line);
+      if (!pickupAddress) {
+        setSaving(false);
+        setGeocoding(false);
+        return toast(locale === 'ku' ? 'ناونیشانی کاڵا لە وەسف/شوێن نییە' : `${item.title || 'Item'} has no pickup address in its description/location`, 'error');
+      }
+      const pickup: [number, number] | null =
+        item.latitude != null && item.longitude != null
+          ? [Number(item.latitude), Number(item.longitude)]
+          : await geocode(pickupAddress);
+      if (!pickup) {
+        setSaving(false);
+        setGeocoding(false);
+        return toast(locale === 'ku' ? 'شوێنی هەڵگرتنی کاڵا نەدۆزرایەوە' : `Could not locate pickup for ${item.title || 'item'}`, 'error');
+      }
+      const km = distanceKm(pickup, dropCoords);
+      rows.push({
+        user_id: user.id,
+        pickup_address: `${item.title || 'Package'} - ${pickupAddress}`,
+        drop_address: form.drop_address,
+        pickup_lat: pickup[0], pickup_lng: pickup[1],
+        drop_lat: dropCoords[0], drop_lng: dropCoords[1],
+        cost: Math.round(2000 + km * 1500),
+        eta_minutes: Math.max(5, Math.round(km * 8)),
+      });
+    }
+    setGeocoding(false);
+    const { error } = await supabase.from('deliveries').insert(rows);
     setSaving(false);
     if (error) return toast(error.message, 'error');
     toast(t.common.success);
@@ -284,41 +331,73 @@ function DeliveryFormModal({ onClose, onSaved }: { onClose: () => void; onSaved:
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <form onSubmit={submit} className="bg-white dark:bg-zinc-900 rounded-3xl p-6 w-full max-w-md">
+      <form onSubmit={submit} className="bg-white dark:bg-zinc-900 rounded-3xl p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-black">{t.delivery.requestDelivery}</h2>
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1 block">{t.delivery.pickup}</label>
-            <div className="flex gap-2">
-              <input value={form.pickup_address} onChange={(e) => { setForm({ ...form, pickup_address: e.target.value }); setPickupCoords(null); }} required
-                placeholder={locale === 'ku' ? 'بۆ نموونە: هەولێر، گەڕەکی ٣٢' : 'e.g. Erbil, 32 District'}
-                className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              <button type="button" onClick={lookupPickup} disabled={geocoding === 'pickup'} className="px-3 rounded-xl bg-orange-500 text-white text-xs font-black flex items-center gap-1">
-                {geocoding === 'pickup' ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-              </button>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 block">{locale === 'ku' ? 'کاڵاکانی سەبەتە' : 'Cart items to deliver'}</label>
+              {cartItems.length > 0 && (
+                <button type="button" onClick={() => setSelectedCartIds(selectedCartIds.length === cartItems.length ? [] : cartItems.map((line) => line.id))} className="text-xs font-black text-orange-500">
+                  {selectedCartIds.length === cartItems.length ? (locale === 'ku' ? 'لابردنی هەموو' : 'Clear') : (locale === 'ku' ? 'هەڵبژاردنی هەموو' : 'Select all')}
+                </button>
+              )}
             </div>
-            {pickupCoords && <div className="text-[10px] font-bold text-emerald-600 mt-1">✓ {pickupCoords[0].toFixed(4)}, {pickupCoords[1].toFixed(4)}</div>}
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              {cartLoading ? (
+                <div className="p-4 text-center text-zinc-500"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
+              ) : cartItems.length === 0 ? (
+                <div className="p-4 text-sm font-bold text-zinc-500">{locale === 'ku' ? 'سەبەتەکەت بەتاڵە' : 'Your cart is empty'}</div>
+              ) : cartItems.map((line) => {
+                const item = line.item || {};
+                const selected = selectedCartIds.includes(line.id);
+                const pickupAddress = pickupAddressFor(line);
+                return (
+                  <button key={line.id} type="button" onClick={() => toggleCartLine(line.id)} className={`w-full p-3 text-start flex items-center gap-3 border-b last:border-b-0 border-zinc-200 dark:border-zinc-800 ${selected ? 'bg-orange-50 dark:bg-orange-950/20' : 'bg-white dark:bg-zinc-900'}`}>
+                    <span className={`w-5 h-5 rounded-md border grid place-items-center shrink-0 ${selected ? 'bg-orange-500 border-orange-500 text-white' : 'border-zinc-300 dark:border-zinc-700'}`}>{selected ? '✓' : ''}</span>
+                    <PackageCheck className="w-5 h-5 text-orange-500 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black line-clamp-1">{item.title}</span>
+                      <span className={`block text-xs font-bold line-clamp-1 ${pickupAddress ? 'text-zinc-500' : 'text-red-500'}`}>
+                        {pickupAddress || (locale === 'ku' ? 'ناونیشان لە وەسف/شوێن نییە' : 'No pickup address in description/location')}
+                      </span>
+                    </span>
+                    <span className="text-xs font-black text-zinc-500">x{line.quantity}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1 block">{t.delivery.drop}</label>
             <div className="flex gap-2">
-              <input value={form.drop_address} onChange={(e) => { setForm({ ...form, drop_address: e.target.value }); setDropCoords(null); }} required
-                placeholder={locale === 'ku' ? 'بۆ نموونە: سلێمانی، گەڕەکی سالم' : 'e.g. Sulaymaniyah, Salim St'}
+              <input value={form.drop_address} onChange={(e) => setForm({ ...form, drop_address: e.target.value })} required readOnly
+                placeholder={locale === 'ku' ? 'شوێنی گەیاندن لەسەر نەخشە دیاری بکە' : 'Pick your destination on the map'}
                 className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              <button type="button" onClick={lookupDrop} disabled={geocoding === 'drop'} className="px-3 rounded-xl bg-orange-500 text-white text-xs font-black flex items-center gap-1">
-                {geocoding === 'drop' ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              <button type="button" onClick={() => setMapOpen(true)} className="px-3 rounded-xl bg-orange-500 text-white text-xs font-black flex items-center gap-1">
+                <MapPin className="w-4 h-4" /> {locale === 'ku' ? 'نەخشە' : 'Map'}
               </button>
             </div>
             {dropCoords && <div className="text-[10px] font-bold text-emerald-600 mt-1">✓ {dropCoords[0].toFixed(4)}, {dropCoords[1].toFixed(4)}</div>}
           </div>
-          <button disabled={saving} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+          <button disabled={saving || cartLoading || selectedLines.length === 0 || !dropCoords} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+            {(saving || geocoding) && <Loader2 className="w-4 h-4 animate-spin" />}
             {t.common.submit}
           </button>
         </div>
+        <LocationPicker
+          open={mapOpen}
+          onClose={() => setMapOpen(false)}
+          locale={locale}
+          initial={dropCoords ? { latitude: dropCoords[0], longitude: dropCoords[1] } : null}
+          onPick={(result) => {
+            setDropCoords([result.latitude, result.longitude]);
+            setForm({ drop_address: result.address || `${result.latitude.toFixed(5)}, ${result.longitude.toFixed(5)}` });
+          }}
+        />
       </form>
     </div>
   );

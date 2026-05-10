@@ -168,12 +168,21 @@ create table if not exists public.deliveries (
   user_id uuid not null references public.profiles(id) on delete cascade,
   pickup_address text not null,
   drop_address text not null,
+  pickup_lat double precision,
+  pickup_lng double precision,
+  drop_lat double precision,
+  drop_lng double precision,
+  driver_lat double precision,
+  driver_lng double precision,
   status delivery_status not null default 'requested',
   driver_name text,
+  driver_phone text,
   cost numeric(12,2) not null default 0,
   eta_minutes integer,
   created_at timestamptz not null default now()
 );
+create index if not exists deliveries_user_created_idx on public.deliveries(user_id, created_at desc);
+create index if not exists deliveries_status_idx on public.deliveries(status);
 
 -- ============ TRIGGERS ============
 

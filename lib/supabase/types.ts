@@ -55,7 +55,7 @@ export type Database = {
   };
 };
 
-export type UserRole = 'user' | 'seller' | 'brand' | 'admin';
+export type UserRole = 'user' | 'seller' | 'brand' | 'delivery' | 'admin';
 export type Tier = 'free' | 'premium' | 'gold';
 
 export type Profile = {
@@ -171,12 +171,19 @@ export type Message = {
 
 export type Delivery = {
   id: string;
-  order_id: string;
+  order_id: string | null;
   user_id: string;
   pickup_address: string;
   drop_address: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  drop_lat: number | null;
+  drop_lng: number | null;
+  driver_lat: number | null;
+  driver_lng: number | null;
   status: 'requested' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
   driver_name: string | null;
+  driver_phone: string | null;
   cost: number;
   eta_minutes: number | null;
   created_at: string;

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GraduationCap, Plus, Clock, X, Loader2, Play, Upload } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
+import { uploadImageFast } from '@/lib/upload-fast';
 
 const CATEGORIES = ['business', 'tech', 'design', 'marketing', 'language', 'lifestyle', 'other'];
 
@@ -16,21 +17,51 @@ export function CoursesClient({ courses, enrollments }: { courses: any[]; enroll
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState<'all' | 'mine'>('all');
-  const enrolledIds = new Set(enrollments.map((e) => e.course_id));
+  const [localEnrollments, setLocalEnrollments] = useState<any[]>(enrollments);
+  const [busyCourseId, setBusyCourseId] = useState<string | null>(null);
+  const [busyEnrollmentId, setBusyEnrollmentId] = useState<string | null>(null);
+  const enrolledIds = new Set(localEnrollments.map((e) => e.course_id));
+
+  useEffect(() => {
+    setLocalEnrollments(enrollments);
+  }, [enrollments]);
 
   const enroll = async (course: any) => {
     if (!user) { router.push('/login?next=/courses'); return; }
+    if (busyCourseId || enrolledIds.has(course.id)) return;
+    setBusyCourseId(course.id);
     const supabase = createClient();
-    const { error } = await supabase.from('course_enrollments').insert({ course_id: course.id, user_id: user.id });
-    if (error) return toast(error.message, 'error');
+    const { data, error } = await supabase
+      .from('course_enrollments')
+      .insert({ course_id: course.id, user_id: user.id })
+      .select('*, course:courses(*)')
+      .single();
+    setBusyCourseId(null);
+    if (error) {
+      if (error.code === '23505') {
+        setLocalEnrollments((prev) => prev.some((e) => e.course_id === course.id) ? prev : [
+          ...prev,
+          { id: `local-${course.id}`, course_id: course.id, user_id: user.id, progress: 0, course },
+        ]);
+        return;
+      }
+      return toast(error.message, 'error');
+    }
+    if (data) {
+      setLocalEnrollments((prev) => prev.some((e) => e.id === data.id || e.course_id === data.course_id) ? prev : [...prev, data]);
+    }
     toast(t.common.success);
     router.refresh();
   };
 
   const updateProgress = async (enrollmentId: string, progress: number) => {
+    if (busyEnrollmentId === enrollmentId) return;
+    setBusyEnrollmentId(enrollmentId);
     const supabase = createClient();
     const { error } = await supabase.from('course_enrollments').update({ progress }).eq('id', enrollmentId);
+    setBusyEnrollmentId(null);
     if (error) return toast(error.message, 'error');
+    setLocalEnrollments((prev) => prev.map((e) => e.id === enrollmentId ? { ...e, progress } : e));
     router.refresh();
   };
 
@@ -53,7 +84,7 @@ export function CoursesClient({ courses, enrollments }: { courses: any[]; enroll
         </button>
         {user && (
           <button onClick={() => setTab('mine')} className={`px-4 py-2 rounded-xl font-black text-sm ${tab === 'mine' ? 'bg-orange-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
-            {t.courses.myEnrollments} ({enrollments.length})
+            {t.courses.myEnrollments} ({localEnrollments.length})
           </button>
         )}
       </div>
@@ -84,10 +115,12 @@ export function CoursesClient({ courses, enrollments }: { courses: any[]; enroll
                   </div>
                   <button
                     onClick={() => enroll(c)}
-                    disabled={enrolledIds.has(c.id)}
+                    disabled={busyCourseId === c.id || enrolledIds.has(c.id)}
                     className="mt-auto w-full py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black disabled:opacity-50"
                   >
-                    {enrolledIds.has(c.id) ? (locale === 'ku' ? 'تۆمارکراوە' : 'Enrolled') : t.courses.enroll}
+                    {busyCourseId === c.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    ) : enrolledIds.has(c.id) ? (locale === 'ku' ? 'تۆمارکراوە' : 'Enrolled') : t.courses.enroll}
                   </button>
                 </div>
               </div>
@@ -95,11 +128,11 @@ export function CoursesClient({ courses, enrollments }: { courses: any[]; enroll
           </div>
         )
       ) : (
-        enrollments.length === 0 ? (
+        localEnrollments.length === 0 ? (
           <Empty text={locale === 'ku' ? 'هیچ خولێکت نییە' : 'No enrollments yet'} />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {enrollments.map((e) => (
+            {localEnrollments.map((e) => (
               <div key={e.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800">
                 <h3 className="font-black mb-2">{e.course?.title}</h3>
                 <div className="mb-3">
@@ -111,8 +144,12 @@ export function CoursesClient({ courses, enrollments }: { courses: any[]; enroll
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => updateProgress(e.id, Math.min(100, e.progress + 25))} className="flex-1 py-2 rounded-xl bg-orange-500 text-white font-black text-sm flex items-center justify-center gap-1">
-                    <Play className="w-3 h-3" /> +25%
+                  <button
+                    onClick={() => updateProgress(e.id, Math.min(100, Number(e.progress || 0) + 25))}
+                    disabled={busyEnrollmentId === e.id || Number(e.progress || 0) >= 100 || String(e.id).startsWith('local-')}
+                    className="flex-1 py-2 rounded-xl bg-orange-500 text-white font-black text-sm flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    {busyEnrollmentId === e.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} +25%
                   </button>
                 </div>
               </div>
@@ -134,21 +171,25 @@ function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const [form, setForm] = useState({ title: '', description: '', price: '0', duration_minutes: '60', category: 'tech', content_url: '', cover_url: '' });
+  const [coverPreview, setCoverPreview] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const uploadImage = async (file: File) => {
+    const preview = URL.createObjectURL(file);
+    setCoverPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return preview;
+    });
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/items/upload', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok || !json.url) throw new Error(json.error || 'Upload failed');
-      setForm((f) => ({ ...f, cover_url: json.url }));
+      const url = await uploadImageFast(file);
+      URL.revokeObjectURL(preview);
+      setCoverPreview('');
+      setForm((f) => ({ ...f, cover_url: url }));
       toast(locale === 'ku' ? 'وێنە بارکرا' : 'Cover uploaded', 'success');
     } catch (err: any) {
-      toast(err?.message || 'Upload failed', 'error');
+      toast(err?.name === 'AbortError' ? (locale === 'ku' ? 'بارکردن کاتی بەسەرچوو' : 'Upload timed out') : (err?.message || 'Upload failed'), 'error');
     } finally {
       setUploading(false);
     }
@@ -192,10 +233,10 @@ function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
               {locale === 'ku' ? 'وێنە بارکە' : 'Upload cover'}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0])} />
             </label>
-            {form.cover_url && (
+            {(coverPreview || form.cover_url) && (
               <div className="mt-3 rounded-2xl overflow-hidden w-full h-40 bg-zinc-100 dark:bg-zinc-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={form.cover_url} alt="Course cover" className="w-full h-full object-cover" />
+                <img src={coverPreview || form.cover_url} alt="Course cover" className="w-full h-full object-cover" />
               </div>
             )}
           </div>
@@ -213,7 +254,7 @@ function CourseFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
             </select>
           </div>
           <Field label={locale === 'ku' ? 'لینکی ناوەڕۆک' : 'Content URL'} value={form.content_url} onChange={(v) => setForm({ ...form, content_url: v })} />
-          <button disabled={saving} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+          <button disabled={saving || uploading} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {t.common.save}
           </button>

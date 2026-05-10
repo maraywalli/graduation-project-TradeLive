@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, MapPin, Ticket as TicketIcon, Plus, X, Loader2, QrCode } from 'lucide-react';
+import { Calendar, MapPin, Ticket as TicketIcon, Plus, X, Loader2, QrCode, Upload } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuth } from '@/lib/auth/provider';
 import { createClient } from '@/lib/supabase/browser';
 import { toast } from '@/components/ui/Toaster';
+import { uploadImageFast } from '@/lib/upload-fast';
 
 export function EventsClient({ events, myTickets }: { events: any[]; myTickets: any[] }) {
   const { t, locale } = useI18n();
@@ -161,8 +162,30 @@ function Empty({ icon, text }: { icon: React.ReactNode; text: string }) {
 function EventFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t, locale } = useI18n();
   const { user } = useAuth();
-  const [form, setForm] = useState({ title: '', description: '', venue: '', starts_at: '', ticket_price: '0', total_tickets: '100' });
+  const [form, setForm] = useState({ title: '', description: '', venue: '', starts_at: '', ticket_price: '0', total_tickets: '100', cover_url: '' });
+  const [coverPreview, setCoverPreview] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadCover = async (file: File) => {
+    const preview = URL.createObjectURL(file);
+    setCoverPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return preview;
+    });
+    setUploading(true);
+    try {
+      const url = await uploadImageFast(file);
+      URL.revokeObjectURL(preview);
+      setCoverPreview('');
+      setForm((f) => ({ ...f, cover_url: url }));
+      toast(locale === 'ku' ? 'وێنە بارکرا' : 'Cover uploaded', 'success');
+    } catch (err: any) {
+      toast(err?.name === 'AbortError' ? (locale === 'ku' ? 'بارکردن کاتی بەسەرچوو' : 'Upload timed out') : (err?.message || 'Upload failed'), 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,6 +196,7 @@ function EventFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       organizer_id: user.id,
       title: form.title,
       description: form.description || null,
+      cover_url: form.cover_url || null,
       venue: form.venue,
       starts_at: new Date(form.starts_at).toISOString(),
       ticket_price: Number(form.ticket_price),
@@ -192,6 +216,22 @@ function EventFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mb-1 block">
+              {locale === 'ku' ? 'وێنەی بۆنە' : 'Event cover'}
+            </label>
+            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {locale === 'ku' ? 'وێنە بارکە' : 'Upload cover'}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadCover(e.target.files[0])} />
+            </label>
+            {(coverPreview || form.cover_url) && (
+              <div className="mt-3 rounded-2xl overflow-hidden w-full h-40 bg-zinc-100 dark:bg-zinc-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverPreview || form.cover_url} alt="Event cover" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
           <Field label={t.common.title} value={form.title} onChange={(v) => setForm({ ...form, title: v })} required />
           <Field label={t.common.description} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
           <Field label={locale === 'ku' ? 'شوێن' : 'Venue'} value={form.venue} onChange={(v) => setForm({ ...form, venue: v })} required />
@@ -200,7 +240,7 @@ function EventFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             <Field label={locale === 'ku' ? 'نرخی بلیت' : 'Ticket price'} type="number" value={form.ticket_price} onChange={(v) => setForm({ ...form, ticket_price: v })} required />
             <Field label={locale === 'ku' ? 'کۆی بلیتەکان' : 'Total tickets'} type="number" value={form.total_tickets} onChange={(v) => setForm({ ...form, total_tickets: v })} required />
           </div>
-          <button disabled={saving} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
+          <button disabled={saving || uploading} className="mt-2 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {t.common.save}
           </button>
