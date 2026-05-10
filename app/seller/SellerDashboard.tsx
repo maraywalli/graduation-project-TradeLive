@@ -207,39 +207,95 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
     brand_id: (item?.brand_id ?? '') as string,
     stock: (item?.stock?.toString() ?? '1') as string,
   });
+  type UploadTask = {
+    id: string;
+    fileName: string;
+    progress: number;
+    status: 'uploading' | 'done' | 'error';
+    preview: string;
+    error?: string;
+  };
+
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const [locating, setLocating] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const updateUploadTask = (id: string, patch: Partial<UploadTask>) => {
+    setUploadTasks((tasks) => tasks.map((task) => (task.id === id ? { ...task, ...patch } : task)));
+  };
+
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
+
+    const selectedFiles = Array.from(files);
+    const validFiles = selectedFiles.filter((file) => {
+      if (!file.type.startsWith('image/')) {
+        toast(locale === 'ku' ? 'تەنها وێنەکان ڕێگەدەدرێن' : 'Only image uploads are allowed', 'error');
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast(locale === 'ku' ? 'وێنە پێویستە لە خوارەوەی 10 MB بێت' : 'Image must be under 10 MB', 'error');
+        return false;
+      }
+      return true;
+    });
+
+    if (!validFiles.length) return;
+
+    const tasks = validFiles.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: file.name,
+      progress: 0,
+      status: 'uploading' as const,
+      preview: URL.createObjectURL(file),
+    }));
+
+    setUploadTasks((current) => [...current, ...tasks]);
     setUploading(true);
-    const fileArr = Array.from(files);
-    const urls: string[] = [];
-    const CONCURRENCY = 3;
-    for (let i = 0; i < fileArr.length; i += CONCURRENCY) {
-      const batch = fileArr.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.all(batch.map(async (file) => {
-        try {
-          return await uploadImageFast(file);
-        } catch (e: any) {
+
+    const CONCURRENCY = Math.min(5, validFiles.length);
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < validFiles.length; i += CONCURRENCY) {
+      const batchFiles = validFiles.slice(i, i + CONCURRENCY);
+      const batchTasks = tasks.slice(i, i + CONCURRENCY);
+
+      const batchResults = await Promise.allSettled(batchFiles.map((file, index) =>
+        uploadImageFast(file, {
+          timeoutMs: 45_000,
+          onProgress: (percent) => updateUploadTask(batchTasks[index].id, { progress: percent }),
+        })
+      ));
+
+      batchResults.forEach((result, index) => {
+        const task = batchTasks[index];
+        if (result.status === 'fulfilled') {
+          uploadedUrls.push(result.value);
+          updateUploadTask(task.id, { progress: 100, status: 'done' });
+        } else {
+          updateUploadTask(task.id, {
+            progress: 0,
+            status: 'error',
+            error: result.reason?.message || 'Upload failed',
+          });
           toast(
-            e?.name === 'AbortError'
+            result.reason?.name === 'AbortError'
               ? (locale === 'ku' ? 'بارکردن کاتی بەسەرچوو' : 'Upload timed out')
-              : (e?.message || 'Upload failed'),
+              : (result.reason?.message || 'Upload failed'),
             'error',
           );
-          return null;
         }
-      }));
-      for (const u of batchResults) if (u) urls.push(u);
-      if (urls.length) {
-        setForm((f) => ({ ...f, images: [...f.images, ...urls] }));
-        urls.length = 0;
-      }
+      });
     }
+
+    if (uploadedUrls.length) {
+      setForm((f) => ({ ...f, images: [...f.images, ...uploadedUrls] }));
+    }
+
     setUploading(false);
+    setTimeout(() => tasks.forEach((task) => URL.revokeObjectURL(task.preview)), 15_000);
   };
 
   // Capture device location (with the user's consent) so the item shows up
@@ -437,6 +493,24 @@ function ItemFormModal({ item, brands, onClose, onSaved }: { item?: any; brands:
               {locale === 'ku' ? 'وێنە بارکە' : 'Upload images'}
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
             </label>
+
+            {uploadTasks.length > 0 && (
+              <div className="space-y-2 mt-3">
+                {uploadTasks.map((task) => (
+                  <div key={task.id} className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                      <span className="truncate">{task.fileName}</span>
+                      <span>{task.status === 'uploading' ? `${task.progress}%` : task.status === 'done' ? 'Done' : 'Failed'}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                      <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${task.progress}%` }} />
+                    </div>
+                    {task.error && <p className="mt-1 text-[10px] text-red-500">{task.error}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {form.images.length > 0 && (
               <div className="flex gap-2 mt-2 flex-wrap">
                 {form.images.map((url, i) => (
